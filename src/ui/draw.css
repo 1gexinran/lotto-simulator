@@ -156,6 +156,7 @@
 }
 .ticket {
   min-width: 0;
+  min-block-size: var(--reserved-paper-height, 0px);
   padding: 17px clamp(12px, 2.2vw, 25px) 13px;
   border: 1px solid #baae98;
   border-top: 0;
@@ -192,13 +193,16 @@
 .jackpot { margin-top: 8px; padding: 7px 8px; border: 1px solid var(--accent); }
 .jackpot p { margin: 2px 0 0; }
 .ticket-footer { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 11px; text-align: center; font-size: 12px; }
-.ticket-controls { display: flex; flex-wrap: wrap; gap: 8px; }
-.ticket-controls button { min-width: 110px; }
-.ticket-controls.can-skip {
+.ticket-controls {
   position: sticky;
   bottom: 12px;
   z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
+.ticket-controls button { min-width: 110px; }
+.ticket-controls .primary { min-width: 128px; }
 .draw-charts { grid-area: charts; display: grid; gap: 8px; min-width: 0; }
 .draw-charts details { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; }
 .draw-charts summary {
@@ -224,7 +228,6 @@
 .draw-charts tbody th { font-weight: 400; }
 .draw-charts th:not(:first-child), .draw-charts td { text-align: end; }
 .draw-charts td { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.ticket-controls:empty { margin: 0; }
 @media (max-width: 820px) {
   .draw-stage {
     grid-template-columns: minmax(0, 1fr);

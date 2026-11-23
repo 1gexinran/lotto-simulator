@@ -11,6 +11,11 @@ const INTERVAL = 1000
 const BALL_COUNT = 6
 const DURATION = (BALL_COUNT - 1) * INTERVAL + ROLL
 const motionQuery = '(prefers-reduced-motion: reduce)'
+const drawActionLabels = {
+  start: 'Start draw',
+  complete: 'Skip to results',
+  redraw: 'Draw again',
+}
 
 function settleBall(node: HTMLElement) {
   node.removeAttribute('data-rolling')
@@ -146,8 +151,12 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
   const rules = RULES[ticket.scenario.game]
   const reduced = useReducedMotion()
   const [printed, setPrinted] = useState(false)
-  const skip = useRef<HTMLButtonElement>(null)
+  const [reservedPaper, setReservedPaper] = useState<{ attempt: number, height: number }>()
+  const paper = useRef<HTMLDivElement>(null)
+  const primaryButton = useRef<HTMLButtonElement>(null)
   const attempt = round.drawAttempt ?? (round.draw ? 1 : 0)
+  const action = round.phase === 'issued' ? 'start' : round.phase === 'revealing' ? 'complete' : 'redraw'
+  const paperHeight = round.phase === 'revealing' && reservedPaper?.attempt === attempt ? reservedPaper.height : undefined
   const printing = !reduced && !printed && printingId === ticket.id && round.phase === 'issued'
   useEffect(() => {
     if (!printing) return
@@ -156,12 +165,23 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
   }, [printing])
 
   useLayoutEffect(() => {
-    if (round.phase === 'revealing') {
-      window.scrollTo(0, 0)
-      skip.current?.focus({ preventScroll: true })
+    if (round.phase === 'revealing') primaryButton.current?.focus({ preventScroll: true })
+    if (round.phase === 'complete' &&
+      (document.activeElement === document.body || document.activeElement === primaryButton.current)) {
+      const bounds = heading.current?.getBoundingClientRect()
+      const target = bounds && bounds.bottom > 0 && bounds.top < window.innerHeight ? heading : primaryButton
+      target.current?.focus({ preventScroll: true })
     }
-    if (round.phase === 'complete' && document.activeElement === document.body) heading.current?.focus()
   }, [round.phase, attempt, heading])
+
+  function runDrawAction() {
+    if (busy) return
+    if (action === 'redraw' && paper.current) {
+      // Keep the space occupied by the checked ticket while the new result is pending.
+      setReservedPaper({ attempt: attempt + 1, height: paper.current.getBoundingClientRect().height })
+    }
+    send({ type: action })
+  }
 
   const result = round.phase === 'complete' ? scoreTicket(ticket, round.draw!, rules) : undefined
   return <main className={`draw-stage ${rules.game}`}>
@@ -173,23 +193,19 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
       <Tube key={attempt} round={round} complete={() => send({ type: 'complete' })} reduced={reduced} />
     </section>
     <div className="ticket-column">
-      <div className={`printer ${printing ? 'printing' : ''}`}>
+      <div className={`printer ${printing ? 'printing' : ''}`}
+        style={paperHeight === undefined ? undefined : { '--reserved-paper-height': `${paperHeight}px` } as CSSProperties}>
         <div className="printer-slot" aria-hidden="true" />
         <div className="feed-mask">
-          <div className="feed-paper"><Ticket ticket={ticket} result={result} heading={heading} /></div>
+          <div className="feed-paper" ref={paper}><Ticket ticket={ticket} result={result} heading={heading} /></div>
         </div>
       </div>
-      <div className={`draw-controls ticket-controls${round.phase === 'revealing' ? ' can-skip' : ''}`}>
-        {round.phase === 'issued' && <button type="button" className="primary" aria-disabled={busy}
-          onClick={() => send({ type: 'start' })}>Start draw</button>}
-        {round.phase === 'revealing' && <button type="button" className="primary" ref={skip} aria-disabled={busy}
-          onClick={() => send({ type: 'complete' })}>Skip to results</button>}
-        {round.phase === 'complete' && <>
-          <button type="button" className="primary" aria-disabled={busy} onClick={() => send({ type: 'redraw' })}>
-            Draw again
-          </button>
-          <button type="button" aria-disabled={busy} onClick={() => send({ type: 'again' })}>Play again</button>
-        </>}
+      <div className="draw-controls ticket-controls">
+        <button key={action} type="button" className="primary" ref={primaryButton} aria-disabled={busy} onClick={runDrawAction}>
+          {drawActionLabels[action]}
+        </button>
+        {round.phase === 'complete' &&
+          <button type="button" aria-disabled={busy} onClick={() => send({ type: 'again' })}>Play again</button>}
       </div>
     </div>
     <DrawCharts scenario={ticket.scenario} />

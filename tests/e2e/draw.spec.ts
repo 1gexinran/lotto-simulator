@@ -68,11 +68,17 @@ test('simultaneous Starts and a second-tab reload settle the same six balls ever
   await deterministicWords(other, words)
   await other.goto('/')
   await expect(start(other)).toBeVisible()
+  const firstStart = await start(page).elementHandle()
+  const secondStart = await start(other).elementHandle()
   await Promise.all([
-    start(page).evaluate((button: HTMLButtonElement) => button.click()),
-    start(other).evaluate((button: HTMLButtonElement) => button.click()),
+    firstStart.evaluate((button: HTMLButtonElement) => button.click()),
+    secondStart.evaluate((button: HTMLButtonElement) => button.click()),
   ])
-  await expect(balls(page)).toHaveCount(2)
+  await expect(other.getByRole('button', { name: 'Skip to results' })).toBeVisible()
+  // A delayed activation of the old Start button must not activate Skip in its place.
+  await secondStart.evaluate((button: HTMLButtonElement) => button.click())
+  await expect(balls(page).first()).toBeVisible()
+  expect(await balls(page).count()).toBeLessThan(6)
   await expect(results(page)).toHaveCount(0)
   await other.reload()
   for (const tab of [page, other]) {
@@ -171,3 +177,33 @@ test('the prize and odds tables start folded and show the selected game', async 
   await page.getByText('Prize chart', { exact: true }).click()
   await expect(prizes).toBeHidden()
 })
+
+for (const viewport of [{ width: 1280, height: 1100 }, { width: 390, height: 844 }]) {
+  test(`Draw again can be skipped without moving the pointer at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await deterministicWords(page, [...words, 0, 0, 0, 0, 0, 7, 0])
+    await seed(page, fixture('pb', 'issued'))
+    const skip = page.getByRole('button', { name: 'Skip to results' })
+    const redraw = page.getByRole('button', { name: 'Draw again' })
+    await start(page).click()
+    await skip.click()
+    await expect(ticket(page)).toContainText('2 jackpot-winning plays')
+    await redraw.scrollIntoViewIfNeeded()
+    const before = (await redraw.boundingBox())!
+    const scroll = await page.evaluate(() => window.scrollY)
+    const x = before.x + before.width / 2
+    const y = before.y + before.height / 2
+
+    await page.mouse.click(x, y)
+    await expect(skip).toBeVisible()
+    const after = (await skip.boundingBox())!
+    expect(Math.abs(after.x - before.x)).toBeLessThan(1)
+    expect(Math.abs(after.y - before.y)).toBeLessThan(1)
+    expect(await page.evaluate(() => window.scrollY)).toBe(scroll)
+    await expect(results(page)).toHaveCount(0)
+
+    await page.mouse.click(x, y)
+    await expect(ticket(page)).toContainText('$8')
+    await expect(balls(page)).toHaveText(['01', '02', '03', '04', '05', '08'])
+  })
+}
