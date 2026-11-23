@@ -144,6 +144,7 @@
 }
 .is-active .cover { opacity: 0; pointer-events: none; transform: translateY(-8px); }
 .cover h1 { font: 400 clamp(39px, 6vw, 64px)/1.02 var(--serif); letter-spacing: -.052em; margin: 0 0 25px; }
+.resume-ticket { margin-top: 12px; }
 .game-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .game-card {
   position: relative;

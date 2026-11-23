@@ -13,9 +13,11 @@ export type Round = {
   game: Game | null
   drafts: Record<Game, Draft>
   scenarios: Partial<Record<Game, Scenario>>
+  atChooser?: true
   ticket?: IssuedTicket
   draw?: Draw
   startedAt?: number
+  drawAttempt?: number
 }
 
 export type Command =
@@ -25,7 +27,7 @@ export type Command =
   | { type: 'move', step: -1 | 1 }
   | { type: 'payment', value: Payment }
   | { type: 'powerPlay', value: boolean }
-  | { type: 'chooser' | 'wholeQuick' | 'clear' | 'finish' | 'edit' | 'confirm' | 'start' | 'complete' | 'again' }
+  | { type: 'chooser' | 'resumeTicket' | 'wholeQuick' | 'clear' | 'finish' | 'edit' | 'confirm' | 'start' | 'redraw' | 'complete' | 'again' }
 
 export type Dependencies = { identity: Identity, rng: IntegerSampler }
 export const browserDependencies: Dependencies = { identity: browserIdentity, rng: cryptoInteger }
@@ -55,13 +57,30 @@ function mark(line: LineDraft, pool: Pool, value: number) {
 
 export function transition(current: Round, command: Command, dependencies: Dependencies): Round | undefined {
   const { identity, rng } = dependencies
-  if (current.phase === 'complete' && command.type === 'again') return freshRound(identity)
+  if (!current.atChooser && current.phase === 'complete' && command.type === 'again') return freshRound(identity)
   const next = structuredClone(current)
   next.revision++
-  if (current.phase === 'choose' && command.type === 'choose') {
-    next.game = command.game
-    next.phase = 'edit'
+  if ((current.phase === 'choose' || current.atChooser) && command.type === 'choose') {
+    const selected = current.atChooser ? freshRound(identity) : next
+    selected.game = command.game
+    selected.phase = 'edit'
+    return selected
+  }
+  if (current.atChooser) {
+    if (command.type !== 'resumeTicket') return
+    delete next.atChooser
     return next
+  }
+  if (command.type === 'chooser') {
+    if (current.phase === 'edit' || current.phase === 'review') {
+      next.phase = 'choose'
+      return next
+    }
+    if (current.ticket) {
+      next.atChooser = true
+      if (current.phase === 'revealing') next.phase = 'complete'
+      return next
+    }
   }
   const game = next.game
   if (!game) return
@@ -82,9 +101,6 @@ export function transition(current: Round, command: Command, dependencies: Depen
 
   if (current.phase === 'edit') {
     switch (command.type) {
-      case 'chooser':
-        next.phase = 'choose'
-        return next
       case 'mark': {
         const max = command.pool === 'white' ? rules.whiteMax : rules.specialMax
         return inPool(command.value, max) && mark(line, command.pool, command.value) ? next : undefined
@@ -129,8 +145,10 @@ export function transition(current: Round, command: Command, dependencies: Depen
     next.phase = 'issued'
     return next
   }
-  if (current.phase === 'issued' && command.type === 'start') {
+  if ((current.phase === 'issued' && command.type === 'start') ||
+    (current.phase === 'complete' && command.type === 'redraw')) {
     next.draw = createDraw(next.ticket!.scenario, rules, rng)
+    next.drawAttempt = (current.drawAttempt ?? (current.draw ? 1 : 0)) + 1
     next.startedAt = identity.now().getTime()
     next.phase = 'revealing'
     return next

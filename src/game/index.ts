@@ -3,6 +3,7 @@ export const LETTERS = ['A', 'B', 'C', 'D', 'E'] as const
 export type Letter = typeof LETTERS[number]
 export type Game = 'pb' | 'mm'
 export type Payment = 'cash' | 'annuity'
+export const DEFAULT_PAYMENT: Payment = 'cash'
 export type Pool = 'white' | 'special'
 export type Multiplier = 2 | 3 | 4 | 5 | 10
 export type IntegerSampler = (limit: number) => number
@@ -107,6 +108,11 @@ export const RULES: Record<Game, Rules> = {
 export const MULTIPLIERS = [2, 3, 4, 5, 10] as const
 const POWER_PLAY_WEIGHTS = [24, 13, 3, 2, 1]
 const MEGA_WEIGHTS = [15, 10, 4, 2, 1]
+export const POWER_PLAY_MATCH_FIVE_CENTS = 200_000_000
+
+export function maxPowerPlay(annuityCents: number) {
+  return annuityCents <= 15_000_000_000 ? 10 : 5
+}
 
 export const browserIdentity: Identity = {
   id: () => crypto.randomUUID(),
@@ -118,7 +124,7 @@ export function emptyLine(): LineDraft {
 }
 
 export function emptyDraft(): Draft {
-  return { lines: [emptyLine()], active: 0, payment: null, powerPlay: false }
+  return { lines: [emptyLine()], active: 0, payment: DEFAULT_PAYMENT, powerPlay: false }
 }
 
 export function inPool(value: unknown, max: number): value is number {
@@ -250,7 +256,7 @@ export function createDraw(scenario: Scenario, rules: Rules, rng: IntegerSampler
     edition: EDITION, game: rules.game, drawId: scenario.drawId, white, special,
     ...(rules.game === 'pb' ? {
       powerPlay: sampleMultiplier(
-        scenario.annuityCents <= 15_000_000_000 ? POWER_PLAY_WEIGHTS : POWER_PLAY_WEIGHTS.slice(0, -1), rng,
+        maxPowerPlay(scenario.annuityCents) === 10 ? POWER_PLAY_WEIGHTS : POWER_PLAY_WEIGHTS.slice(0, -1), rng,
       ),
     } : {}),
   }
@@ -271,7 +277,7 @@ export function scoreTicket(ticket: IssuedTicket, draw: Draw, rules: Rules): Res
     if (baseCents === null) return { ...match, tier: 'jackpot', fixedCents: null, setAward: false }
     if (baseCents === 0) return { ...match, tier: 'none', fixedCents: 0, setAward: false }
     if (ticket.powerPlay && matchedWhite.length === 5) {
-      return { ...match, tier: 'fixed', fixedCents: 200_000_000, setAward: true }
+      return { ...match, tier: 'fixed', fixedCents: POWER_PLAY_MATCH_FIVE_CENTS, setAward: true }
     }
     const multiplier = rules.game === 'mm' ? line.multiplier : ticket.powerPlay ? draw.powerPlay : undefined
     return { ...match, tier: 'fixed', fixedCents: baseCents * (multiplier ?? 1), multiplier, setAward: false }

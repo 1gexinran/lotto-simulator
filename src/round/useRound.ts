@@ -28,6 +28,7 @@ export function useRound() {
     if (current.current?.id === next.id && current.current.revision >= next.revision) return
     current.current = next
     setRound(next)
+    if (next.atChooser) setPrintingId(undefined)
     return true
   }
 
@@ -88,7 +89,7 @@ export function useRound() {
   async function send(command: Command, expected = current.current) {
     if (!expected) return
     if (locked.current) {
-      if (expected.phase === 'edit' || expected.phase === 'review') {
+      if (command.type === 'chooser' || expected.phase === 'edit' || expected.phase === 'review') {
         queue.current.push({ command, view: expected })
       }
       return
@@ -114,7 +115,8 @@ export function useRound() {
         next = undefined
         while (queue.current.length && !next) {
           const queued = queue.current.shift()!
-          if (sameView(queued.view, expected)) next = queued.command
+          const sameRoundHome = queued.command.type === 'chooser' && queued.view.id === expected.id
+          if (sameRoundHome || sameView(queued.view, expected)) next = queued.command
         }
       }
     } catch (error) {

@@ -93,7 +93,7 @@ export function pendingLine(line: LineDraft, game: Game) {
 export function Playslip({ round, send, heading }: {
   round: Round, send: Send, heading: RefObject<HTMLHeadingElement | null>,
 }) {
-  const preview = round.phase === 'choose'
+  const preview = round.phase === 'choose' || round.atChooser === true
   const game = preview ? 'pb' : round.game!
   const rules = RULES[game]
   const draft = preview ? neutralDraft : round.drafts[game]
@@ -230,6 +230,8 @@ export function Playslip({ round, send, heading }: {
           <span className="card-ball" aria-hidden="true"><i>{RULES[key].specialMax}</i></span>
         </button>)}
       </div>
+      {round.atChooser && <button type="button" className="back resume-ticket"
+        onClick={() => send({ type: 'resumeTicket' })}>Resume ticket</button>}
     </section>
   </main>
 }

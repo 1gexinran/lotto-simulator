@@ -51,6 +51,8 @@ test('keyboard only completes Powerball with the production sampler and CSS moti
   expect(Number(values[5])).toBeLessThanOrEqual(26)
   await expect(page.getByRole('heading', { name: 'Powerball ticket' })).toBeFocused()
   await keyboard.press(tab)
+  await expect(page.getByRole('button', { name: 'Draw again' })).toBeFocused()
+  await keyboard.press(tab)
   await expect(page.getByRole('button', { name: 'Play again' })).toBeFocused()
   if (info.project.name === 'chromium') await page.screenshot({ path: info.outputPath('keyboard-results.png'), fullPage: true })
   await keyboard.press('Enter')

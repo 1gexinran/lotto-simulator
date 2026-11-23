@@ -41,13 +41,11 @@ it('restores partial marks, separates game drafts, and omits a cleared middle bo
   await act({ type: 'finish' })
   expect(round.phase).toBe('review')
   const scenario = round.scenarios.pb
-  await act({ type: 'confirm' })
-  expect(round.phase).toBe('review')
   await act({ type: 'edit' })
   await act({ type: 'finish' })
   expect(round.scenarios.pb).toEqual(scenario)
-  await act({ type: 'payment', value: 'cash' })
   await act({ type: 'confirm' })
+  expect(round.ticket?.payment).toBe('cash')
   expect(round.ticket?.lines.map(line => line.letter)).toEqual(['A', 'C'])
   expect(round.ticket?.totalCents).toBe(400)
 })
@@ -153,4 +151,69 @@ it.each(['edition', 'sparse boards'])('retains an unreadable record (%s) until a
   expect(fresh).toMatchObject({ phase: 'choose', revision: 0 })
   expect(fresh.id).not.toBe(record.id)
   expect(await store.restore()).toEqual(fresh)
+})
+
+it('creates a single replacement outcome for an issued ticket across racing redraws', async () => {
+  const { store, factory, dependencies } = setup()
+  const second = createStore(factory, dependencies)
+  const ready = await review(store, 'mm')
+  const issued = (await store.dispatch(ready, { type: 'confirm' })).round
+  const first = (await store.dispatch(issued, { type: 'start' })).round
+  const complete = (await store.dispatch(first, { type: 'complete' })).round
+  expect(scoreTicket(complete.ticket!, complete.draw!, RULES.mm).jackpotShares).toBe(1)
+
+  dependencies.rng.mockReturnValue(1)
+  const receipts = await Promise.all([
+    store.dispatch(complete, { type: 'redraw' }), second.dispatch(complete, { type: 'redraw' }),
+  ])
+  expect(receipts.filter(receipt => receipt.outcome === 'applied')).toHaveLength(1)
+  const replacement = receipts[0].round
+  expect(receipts[1].round).toEqual(replacement)
+  expect(replacement).toMatchObject({ phase: 'revealing', drawAttempt: 2, ticket: issued.ticket })
+  expect(replacement.draw?.white).toEqual([2, 3, 4, 5, 6])
+  expect((await store.dispatch(first, { type: 'complete' })).outcome).toBe('stale')
+  const restored = await second.restore()
+  expect(restored.phase).toBe('complete')
+  expect(scoreTicket(restored.ticket!, restored.draw!, RULES.mm)).toMatchObject({ jackpotShares: 0, fixedCents: 100_000 })
+})
+
+it('loads an older unpaid draft with Cash value and keeps a saved annuity election', async () => {
+  const { store, factory } = setup()
+  const blank = await store.restore()
+  const selected = (await store.dispatch(blank, { type: 'choose', game: 'pb' })).round
+  const previous = {
+    ...selected, drafts: {
+      pb: { ...selected.drafts.pb, payment: null },
+      mm: { ...selected.drafts.mm, payment: 'annuity' },
+    },
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = factory.open('live-lotto')
+    request.onsuccess = () => {
+      const db = request.result
+      const tx = db.transaction('rounds', 'readwrite')
+      tx.objectStore('rounds').put(previous, 'current')
+      tx.oncomplete = () => { db.close(); resolve() }
+      tx.onerror = reject
+    }
+    request.onerror = reject
+  })
+  const restored = await store.restore()
+  expect(restored.drafts.pb.payment).toBe('cash')
+  expect(restored.drafts.mm.payment).toBe('annuity')
+})
+
+it('honors Home when another tab completed the same ticket first', async () => {
+  const { store } = setup()
+  const ready = await review(store)
+  const issued = (await store.dispatch(ready, { type: 'confirm' })).round
+  const revealing = (await store.dispatch(issued, { type: 'start' })).round
+  const complete = (await store.dispatch(revealing, { type: 'complete' })).round
+
+  const home = await store.dispatch(revealing, { type: 'chooser' })
+  expect(home).toMatchObject({
+    outcome: 'applied',
+    round: { atChooser: true, phase: 'complete', ticket: complete.ticket, draw: complete.draw },
+  })
+  expect((await store.restore()).atChooser).toBe(true)
 })

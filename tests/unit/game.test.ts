@@ -29,6 +29,7 @@ it('checks exact pool sizes, bounds and uniqueness independently', () => {
 
 it('quotes only complete boards, preserving their original letters', () => {
   const draft = emptyDraft()
+  draft.payment = null
   draft.lines[0] = { ...line([7, 21, 5, 11, 9], null), specialQuick: true }
   draft.lines[2] = { ...line([], 7), whiteQuick: true }
   expect(quote(draft, RULES.pb)).toMatchObject({

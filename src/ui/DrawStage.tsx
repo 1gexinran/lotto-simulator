@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { RULES, scoreTicket } from '../game'
 import type { Command, Round } from '../round'
+import { DrawCharts } from './DrawCharts'
 import { numberLabel } from './format'
 import { Review } from './Review'
 import { Ticket } from './Ticket'
@@ -15,6 +16,8 @@ function settleBall(node: HTMLElement) {
   node.removeAttribute('data-rolling')
   node.style.removeProperty('--travel')
   node.style.removeProperty('--roll')
+  node.style.removeProperty('--pitch')
+  node.style.removeProperty('--yaw')
 }
 
 function useReducedMotion() {
@@ -71,9 +74,14 @@ function Tube({ round, complete, reduced }: { round: Round, complete: () => void
         }
         const center = width * (index + 0.5) / BALL_COUNT
         const radius = node.offsetWidth / 2
-        const remaining = (1 - time / ROLL) ** 2.4
-        node.style.setProperty('--travel', `${(width - center + radius + 4) * remaining}px`)
-        node.style.setProperty('--roll', `${-144 * remaining}deg`)
+        if (!radius) continue
+        const remainingTime = 1 - time / ROLL
+        const travel = (width - center + radius + 4) * remainingTime ** 2.4
+        const roll = travel / radius
+        node.style.setProperty('--travel', `${travel}px`)
+        node.style.setProperty('--roll', `${roll * 180 / Math.PI}deg`)
+        node.style.setProperty('--pitch', `${18 * Math.sin(roll) * remainingTime}deg`)
+        node.style.setProperty('--yaw', `${32 * Math.sin(roll * 0.7) * remainingTime}deg`)
         node.setAttribute('data-rolling', '')
       }
       if (elapsed >= DURATION) {
@@ -95,6 +103,9 @@ function Tube({ round, complete, reduced }: { round: Round, complete: () => void
     }
   }, [revealing, reduced, round.id, round.startedAt])
 
+  const shownWhite = values.slice(0, Math.min(settled, 5))
+  if (settled === BALL_COUNT) shownWhite.sort((a, b) => a - b)
+
   return <div className="tube-panel">
     <div className="tube-frame">
       <div className="tube-channel">
@@ -108,7 +119,7 @@ function Tube({ round, complete, reduced }: { round: Round, complete: () => void
               data-ball-color={special ? 'red' : 'white'} ref={el => { ballNodes.current[index] = el }}
               style={{ '--slot': index } as CSSProperties} role="img" aria-hidden={!isSettled || undefined}
               aria-label={`${special ? rules.specialName : 'White ball'} ${numberLabel(value)}`}>
-              <span>{numberLabel(value)}</span>
+              <span className="ball-face">{numberLabel(value)}</span>
             </div>
           })}
         </div>
@@ -120,7 +131,7 @@ function Tube({ round, complete, reduced }: { round: Round, complete: () => void
     </div>
     <p className="draw-status" role="status">
       {settled
-        ? `Settled ${settled} of 6 · ${values.slice(0, Math.min(settled, 5)).map(numberLabel).join(' · ')}${settled === 6 ? ` · ${rules.specialName} ${numberLabel(values[5])}` : ''}`
+        ? `Settled ${settled} of 6 · ${shownWhite.map(numberLabel).join(' · ')}${settled === 6 ? ` · ${rules.specialName} ${numberLabel(values[5])}` : ''}`
         : revealing ? 'Drawing in progress' : 'Ready to draw'}
     </p>
     {draw?.powerPlay !== undefined && <p className="draw-power">Power Play drawn <strong>{draw.powerPlay}×</strong></p>}
@@ -136,6 +147,7 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
   const reduced = useReducedMotion()
   const [printed, setPrinted] = useState(false)
   const skip = useRef<HTMLButtonElement>(null)
+  const attempt = round.drawAttempt ?? (round.draw ? 1 : 0)
   const printing = !reduced && !printed && printingId === ticket.id && round.phase === 'issued'
   useEffect(() => {
     if (!printing) return
@@ -149,7 +161,7 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
       skip.current?.focus({ preventScroll: true })
     }
     if (round.phase === 'complete' && document.activeElement === document.body) heading.current?.focus()
-  }, [round.phase])
+  }, [round.phase, attempt, heading])
 
   const result = round.phase === 'complete' ? scoreTicket(ticket, round.draw!, rules) : undefined
   return <main className={`draw-stage ${rules.game}`}>
@@ -158,11 +170,7 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
         <h2 id="draw-title">Simulated draw</h2>
         <span>{rules.name}</span>
       </div>
-      <Tube round={round} complete={() => send({ type: 'complete' })} reduced={reduced} />
-      {round.draw && <div className="draw-controls reveal-controls">
-        {round.phase === 'revealing' && <button type="button" ref={skip} aria-disabled={busy}
-          onClick={() => send({ type: 'complete' })}>Skip to results</button>}
-      </div>}
+      <Tube key={attempt} round={round} complete={() => send({ type: 'complete' })} reduced={reduced} />
     </section>
     <div className="ticket-column">
       <div className={`printer ${printing ? 'printing' : ''}`}>
@@ -171,13 +179,20 @@ export function DrawStage({ round, heading, send, busy, printingId }: {
           <div className="feed-paper"><Ticket ticket={ticket} result={result} heading={heading} /></div>
         </div>
       </div>
-      <div className="draw-controls ticket-controls">
+      <div className={`draw-controls ticket-controls${round.phase === 'revealing' ? ' can-skip' : ''}`}>
         {round.phase === 'issued' && <button type="button" className="primary" aria-disabled={busy}
           onClick={() => send({ type: 'start' })}>Start draw</button>}
-        {round.phase === 'complete' && <button type="button" className="primary" aria-disabled={busy}
-          onClick={() => send({ type: 'again' })}>Play again</button>}
+        {round.phase === 'revealing' && <button type="button" className="primary" ref={skip} aria-disabled={busy}
+          onClick={() => send({ type: 'complete' })}>Skip to results</button>}
+        {round.phase === 'complete' && <>
+          <button type="button" className="primary" aria-disabled={busy} onClick={() => send({ type: 'redraw' })}>
+            Draw again
+          </button>
+          <button type="button" aria-disabled={busy} onClick={() => send({ type: 'again' })}>Play again</button>
+        </>}
       </div>
     </div>
+    <DrawCharts scenario={ticket.scenario} />
     {printing && <div className="review-away" inert aria-hidden="true">
       <Review round={round} send={() => {}} busy={true} />
     </div>}

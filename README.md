@@ -2,6 +2,10 @@
 
 Choose Powerball or Mega Millions, mark up to five plays, and print a simulated Texas lottery ticket. Start a six-ball draw on demand and check every play on the same ticket. The browser saves the current round locally.
 
+## Demo
+
+![A Powerball Quick Pick play from game selection through ticket printing, the six-ball draw, and prize checking.](docs/demos/live-lotto-demo.gif)
+
 ## Run locally
 
 Run these commands from the repository root with Node.js 22.12 or later and npm.

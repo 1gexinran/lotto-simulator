@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { deterministicWords, fixture, seed, start, ticket } from './fixtures'
+import { balls, deterministicWords, fixture, results, seed, start, ticket } from './fixtures'
 
 test('concurrent confirms print one ID and independent per-play multipliers', async ({ page, context }) => {
   await deterministicWords(page, [0, 29])
@@ -50,4 +50,46 @@ test('a failed confirm stays in review and Retry issues the saved five-line tick
   await expect(start(page)).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
   await page.screenshot({ path: info.outputPath('issued.png'), fullPage: true })
+})
+
+test('the chooser can resume a printed ticket or start a new one', async ({ page }) => {
+  await seed(page, fixture('mm', 'issued'))
+  const home = page.getByRole('button', { name: 'Live Lotto home' })
+  const chooser = page.getByRole('heading', { name: 'Choose your game.' })
+  const saved = ticket(page).getByTestId('ticket-id')
+  const id = await saved.textContent()
+  await home.click()
+  await expect(chooser).toBeFocused()
+  await page.reload()
+  await expect(chooser).toBeVisible()
+  await page.getByRole('button', { name: 'Resume ticket' }).click()
+  await expect(saved).toHaveText(id!)
+  await start(page).click()
+  await expect(page.getByRole('button', { name: 'Skip to results' })).toBeVisible()
+  await home.click()
+  await expect(chooser).toBeVisible()
+  await page.getByRole('button', { name: 'Resume ticket' }).click()
+  await expect(results(page)).toBeVisible()
+  await expect(balls(page)).toHaveCount(6)
+  await expect(saved).toHaveText(id!)
+  await home.click()
+  await page.getByRole('button', { name: /Mega Millions.*5/ }).click()
+  await expect(page.getByRole('heading', { name: /Mega Millions Board A/ })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Finish', exact: true })).toBeDisabled()
+  await home.click()
+  await expect(chooser).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Resume ticket' })).toHaveCount(0)
+})
+
+test('Home requested during Start opens the chooser after the draw is saved', async ({ page }) => {
+  await seed(page, fixture('pb', 'issued'))
+  await expect(start(page)).toBeVisible()
+  await start(page).evaluate((button: HTMLButtonElement) => {
+    button.click()
+    document.querySelector<HTMLButtonElement>('button[aria-label="Live Lotto home"]')!.click()
+  })
+  await expect(page.getByRole('heading', { name: 'Choose your game.' })).toBeVisible()
+  await page.getByRole('button', { name: 'Resume ticket' }).click()
+  await expect(results(page)).toBeVisible()
+  await expect(balls(page)).toHaveCount(6)
 })

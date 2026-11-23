@@ -17,7 +17,7 @@ import './ui/draw.css'
 function App() {
   const { round, failure, busy, notice, send, printingId, replaceUnreadable } = useRound()
   const heading = useRef<HTMLHeadingElement>(null)
-  const phase = round?.phase
+  const phase = round?.atChooser ? 'choose' : round?.phase
   const active = round?.phase === 'edit' && round.game ? round.drafts[round.game].active : undefined
 
   useLayoutEffect(() => {
@@ -26,12 +26,23 @@ function App() {
     heading.current?.focus({ preventScroll: true })
   }, [phase, round?.game, active])
 
+  function goHome() {
+    if (!round || phase === 'choose') {
+      window.scrollTo(0, 0)
+      heading.current?.focus({ preventScroll: true })
+      return
+    }
+    void send({ type: 'chooser' })
+  }
+
   return <>
     <header className="site-header">
-      <span className="brand"><span className="symbol" aria-hidden="true" />Live Lotto</span>
+      <button type="button" className="brand" aria-label="Live Lotto home" onClick={goHome}>
+        <span className="symbol" aria-hidden="true" />Live Lotto
+      </button>
       <div className="header-right">
         <span className="header-meta">Lottery simulator</span>
-        {phase === 'edit' && <button type="button" className="back" onClick={() => void send({ type: 'chooser' })}>
+        {phase === 'edit' && <button type="button" className="back" onClick={goHome}>
           ← Choose a game
         </button>}
       </div>
@@ -51,7 +62,7 @@ function App() {
     {!round && !failure && <p className="storage-notice" role="status">Opening the saved round…</p>}
     {round && (phase === 'choose' || phase === 'edit') && <Playslip {...{ round, send, heading }} />}
     {round && phase === 'review' && <main><Review {...{ round, send, busy, heading }} /></main>}
-    {round?.ticket && <DrawStage key={round.id} {...{ round, send, busy, heading, printingId }} />}
+    {round?.ticket && !round.atChooser && <DrawStage key={round.id} {...{ round, send, busy, heading, printingId }} />}
   </>
 }
 

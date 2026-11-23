@@ -7,7 +7,7 @@ const DATABASE = 'live-lotto'
 const COLLECTION = 'rounds'
 const KEY = 'current'
 
-type Stamp = Pick<Round, 'id' | 'revision'>
+type Stamp = Pick<Round, 'id' | 'revision' | 'ticket'>
 type Receipt = { round: Round, outcome: 'applied' | 'already' | 'stale' | 'ignored' }
 
 export function createStore(factory: IDBFactory, dependencies = browserDependencies) {
@@ -86,7 +86,9 @@ export function createStore(factory: IDBFactory, dependencies = browserDependenc
         if ((command.type === 'confirm' && round.ticket) ||
           (command.type === 'start' && round.draw) ||
           (command.type === 'complete' && round.phase === 'complete')) return { round, outcome: 'already' }
-        if (round.revision !== expected.revision) return { round, outcome: 'stale' }
+        // Navigating home can preserve a newer draw on the same ticket.
+        const sameTicketHome = command.type === 'chooser' && round.ticket && round.ticket.id === expected.ticket?.id
+        if (round.revision !== expected.revision && !sameTicketHome) return { round, outcome: 'stale' }
         const next = transition(round, command, dependencies)
         if (!next) return { round, outcome: 'ignored' }
         save(next)

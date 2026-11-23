@@ -1,4 +1,4 @@
-import { EDITION, inPool, LETTERS, MULTIPLIERS, RULES, type Game } from '../game'
+import { DEFAULT_PAYMENT, EDITION, inPool, LETTERS, maxPowerPlay, MULTIPLIERS, RULES, type Game } from '../game'
 import type { Round } from './model'
 
 export class InvalidRound extends Error {
@@ -73,7 +73,7 @@ function ticket(value: unknown, game: Game, roundId: string, selected: Stored) {
 function draw(value: unknown, game: Game, selected: Stored) {
   return object(value) && value.edition === EDITION && value.game === game && value.drawId === selected.drawId &&
     whites(value.white, game, 5) && inPool(value.special, RULES[game].specialMax) &&
-    (game === 'pb' ? multiplier(value.powerPlay) && (value.powerPlay !== 10 || Number(selected.annuityCents) <= 15_000_000_000)
+    (game === 'pb' ? multiplier(value.powerPlay) && Number(value.powerPlay) <= maxPowerPlay(Number(selected.annuityCents))
       : value.powerPlay === undefined)
 }
 
@@ -86,19 +86,28 @@ export function decode(value: unknown): Round {
   if ((scenarios.pb !== undefined && !scenario(scenarios.pb, 'pb')) ||
     (scenarios.mm !== undefined && !scenario(scenarios.mm, 'mm'))) throw new InvalidRound()
 
-  const hasNoDraw = value.draw === undefined && value.startedAt === undefined
+  // The original schema used null for drafts awaiting an election.
+  const round = value as Round
+  round.drafts.pb.payment ??= DEFAULT_PAYMENT
+  round.drafts.mm.payment ??= DEFAULT_PAYMENT
+
+  const hasNoDraw = value.draw === undefined && value.startedAt === undefined && value.drawAttempt === undefined
   const hasNoTicket = value.ticket === undefined
+  if (value.atChooser !== undefined && (value.atChooser !== true || hasNoTicket || phase === 'revealing')) {
+    throw new InvalidRound()
+  }
   if (phase === 'choose' && (game === null || game === 'pb' || game === 'mm') && hasNoTicket && hasNoDraw) {
-    return value as Round
+    return round
   }
   if (game !== 'pb' && game !== 'mm') throw new InvalidRound()
-  if (phase === 'edit' && hasNoTicket && hasNoDraw) return value as Round
+  if (phase === 'edit' && hasNoTicket && hasNoDraw) return round
   const selected = scenarios[game]
   if (!scenario(selected, game)) throw new InvalidRound()
-  if (phase === 'review' && hasNoTicket && hasNoDraw) return value as Round
+  if (phase === 'review' && hasNoTicket && hasNoDraw) return round
   if (!ticket(value.ticket, game, value.id, selected)) throw new InvalidRound()
-  if (phase === 'issued' && hasNoDraw) return value as Round
+  if (phase === 'issued' && hasNoDraw) return round
   if ((phase === 'revealing' || phase === 'complete') &&
-    integer(value.startedAt, 0) && draw(value.draw, game, selected)) return value as Round
+    integer(value.startedAt, 0) && (value.drawAttempt === undefined || integer(value.drawAttempt, 1)) &&
+    draw(value.draw, game, selected)) return round
   throw new InvalidRound()
 }
