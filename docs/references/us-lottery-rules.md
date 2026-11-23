@@ -70,9 +70,9 @@ The national draw determines the winning numbers. The selling lottery determines
 
 Sources for retail decisions: [Texas Powerball](https://www.texaslottery.com/export/sites/lottery/Games/Powerball/index.html) · [Texas Mega Millions](https://www.texaslottery.com/export/sites/lottery/Games/Mega_Millions/index.html) · [Powerball bundled pricing](https://www.powerball.com/) · [Powerball California prize note](https://www.powerball.com/powerball-prize-chart) · [Mega Millions California prize note](https://www.megamillions.com/How-to-Play.aspx) · [Double Play participating lotteries](https://www.powerball.com/double-play)
 
-### Materials saved for design review
+### Publisher references for design review
 
-| Local reference | What to look at | Publisher |
+| Reference | What to look at | Publisher |
 |---|---|---|
 | Powerball retail brochure | Page 2 shows the two number fields, Power Play, payment election and boards A–E. Page 1 gives the prize chart. | [Texas Lottery original](https://www.texaslottery.com/export/sites/lottery/Documents/HTP_Powerball_ENG.pdf) |
 | Mega Millions retail brochure | Page 2 explains marking the slip and payment options. Page 1 documents the embedded multiplier and prize chart. | [Texas Lottery original](https://www.texaslottery.com/export/sites/lottery/Documents/HTP_MegaMillions_ENG.pdf) |
