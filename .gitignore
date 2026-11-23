@@ -6,3 +6,7 @@
 /test-results/
 /docs/references/official/
 /docs/references/draw-tube.png
+.env
+.env.*
+!.env.example
+/.npmrc
