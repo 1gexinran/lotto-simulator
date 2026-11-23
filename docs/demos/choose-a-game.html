@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose a game · Live Lotto</title>
+<style>
+*{box-sizing:border-box}
+:root{--paper:#fffaf0;--ink:#242820;--line:#a99e8c;--accent:#aa3825;--board:min(670px,calc(100vw - 32px));--mono:"Courier Prime","Courier New",monospace}
+body{margin:0;background:#e9e3d6;color:var(--ink);font-family:"DM Sans",Arial,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid #136b9a;outline-offset:3px}
+header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,5vw,80px);background:#fcf9f0;border-bottom:1px solid #bdb5a6}
+.brand{font-weight:850;font-size:21px;letter-spacing:-1.3px;display:flex;align-items:center;gap:9px}
+.symbol{width:22px;height:19px;border:2px solid currentColor;border-radius:3px;transform:rotate(-9deg);position:relative}
+.symbol:before,.symbol:after{content:"";position:absolute;width:3px;height:3px;background:currentColor;border-radius:50%;top:5px;left:4px}
+.symbol:after{left:11px;top:8px}
+.back{border:0;background:none;text-decoration:underline;text-underline-offset:4px;font-size:14px;padding:10px}
+.stage{position:relative;isolation:isolate;overflow:hidden;min-height:calc(100svh - 58px);display:grid;place-items:center;padding:40px 16px 64px}
+.sheet{position:absolute;top:24px;left:50%;width:var(--board);transform-origin:50% 0;transform:translateX(-83%) translateY(38px) rotate(-8deg) scale(.74);transition:transform .8s cubic-bezier(.22,.75,.18,1),opacity .65s;opacity:.49}
+.sheet-wrap{width:max-content;display:flex;gap:0;align-items:stretch;background:var(--paper);border:1px solid #b9a68a;box-shadow:2px 8px 22px #5a473321}
+.sheet-wrap{transform:translateX(calc(var(--shift,0) * var(--board)));transition:transform .55s cubic-bezier(.24,.74,.2,1)}
+.board-edge{position:absolute;top:0;bottom:0;width:min(var(--board),calc((100vw - var(--board))/2));border:0;background:transparent;color:var(--accent);padding:0}
+.board-edge.prev{right:100%;text-align:right}.board-edge.forward{left:100%;text-align:left}
+.board-edge:enabled:hover{background:#fffaf026}
+.board-edge:disabled{cursor:default}
+.board-edge span{display:inline-block;opacity:0;font-size:20px}
+.board-edge:enabled:hover span,.board-edge:focus-visible span{opacity:1}
+@media(pointer:coarse){.board-edge:enabled span{opacity:1}}
+.board{transition:background-color .55s,opacity .55s}
+.board.saved{background:#dfdcd2}
+.active .board.upcoming{opacity:.17}
+.active .board.saved{opacity:.67}
+.previous-line{display:none}
+@media(max-width:740px){.previous-line:not(:empty){display:block;font:12px/1.5 var(--mono);color:#575647;background:#eeeae0;padding:5px 8px;margin-bottom:12px}}
+.board{width:var(--board);padding:clamp(14px,3vw,28px);border-right:2px dashed #b5a592;color:var(--accent)}
+.endpaper{min-height:16px;background:repeating-linear-gradient(90deg,currentColor 0 10px,transparent 10px 22px);opacity:.76}
+.slip-head{display:flex;align-items:baseline;justify-content:space-between;border-bottom:3px solid currentColor;margin:15px 0 12px;padding:0 0 6px;gap:8px}
+.slip-head strong{font-size:clamp(25px,4vw,42px);letter-spacing:-2px;font-weight:850}
+.letter{font:700 14px var(--mono);white-space:nowrap}
+.pool-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:15px 0 7px}
+.pool-head b{font:700 14px var(--mono)} .count{font:12px var(--mono);color:#4a463c}
+.numbers{display:grid;grid-template-columns:repeat(10,1fr);gap:3px 4px}
+.number{min-width:0;height:36px;display:grid;place-items:center;position:relative;border:0;background:none;padding:0;font:700 14px var(--mono);isolation:isolate}
+.number:before{content:"";position:absolute;inset:4px 3px;border:1.3px solid var(--accent);border-radius:44%;z-index:-1}
+.number[aria-pressed=true]{color:white}
+.number[aria-pressed=true]:before{background:repeating-linear-gradient(-17deg,#263856 0 2px,#344a68 2px 3px);border-color:#27364d;transform:rotate(-4deg)}
+.status{font:13px var(--mono);min-height:30px;padding-top:10px;color:#303b33}
+.play-actions{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+.play-actions button,.review button{padding:9px 14px;border:1px solid var(--accent);border-radius:4px;color:var(--accent);background:var(--paper)}
+.play-actions .clear{margin-right:auto;border-color:transparent;text-decoration:underline}
+.play-actions .finish{background:var(--accent);color:white}
+.play-actions button:disabled{opacity:.4;cursor:default}
+.play-actions[hidden],.stage[hidden]{display:none}
+.review{width:var(--board);margin:24px auto;padding:clamp(16px,4vw,32px);background:var(--paper);border:1px solid var(--line)}
+.review h2{margin:0;font:32px Georgia,serif}.review li{padding:12px 0;border-bottom:1px dashed var(--line);font:15px/1.5 var(--mono)}.review ul{list-style:none;padding:0}
+.cover{position:relative;z-index:2;width:min(720px,100%);padding:clamp(18px,4vw,45px);background:#fffdf4;border:1px solid #55584a;box-shadow:5px 6px 0 #534e3d35;transition:opacity .23s,transform .32s}
+h1{font-family:"DM Serif Text",Georgia,serif;font-size:clamp(39px,6vw,64px);line-height:1.02;letter-spacing:-.052em;margin:0 0 25px;font-weight:500}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{position:relative;text-align:left;overflow:hidden;isolation:isolate;min-height:138px;padding:19px 18px 17px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;border:0;border-radius:4px;color:white;background:#a53524;transition:transform .18s,box-shadow .18s}
+.card:hover{transform:translateY(-3px);box-shadow:0 4px 0 #28282025}
+.card.mega{background:#233f70}
+.name{font-size:clamp(21px,3vw,29px);font-weight:800;letter-spacing:-1.3px;position:relative}
+.price{font:700 13px var(--mono);position:relative}
+.ball{width:87px;height:87px;position:absolute;right:-18px;bottom:-13px;z-index:-1;border-radius:50%;background:radial-gradient(circle at 32% 26%,#ffcab1,#e36a4b 46%,#ac3829 74%,#63261e);box-shadow:inset 0 0 0 1px #ffffff50;transform:rotate(-22deg);display:grid;place-items:center}
+.mega .ball{background:radial-gradient(circle at 32% 26%,#fff4bf,#e7b94f 48%,#ae7729 76%,#79521c)}
+.ball i{font:800 18px var(--mono);background:#fff4dd;color:#402f29;border-radius:50%;padding:6px}
+.active .sheet{opacity:1;transform:translateX(-50%) translateY(0) rotate(0) scale(1)}
+.active .stage{min-height:max(calc(100svh - 58px),var(--stage-height,730px))}
+.active .cover{opacity:0;pointer-events:none;transform:translateY(-8px)}
+@media(max-width:510px){
+  header{height:50px}.stage{min-height:calc(100svh - 50px);padding-bottom:56px}
+  .cards{grid-template-columns:1fr}.card{min-height:88px;padding:13px 17px}.ball{right:6px;bottom:-17px}
+  .name{font-size:25px}h1{margin-bottom:18px}.sheet{transform:translateX(-66%) translateY(18px) rotate(-9deg) scale(.74)}
+  .numbers{grid-template-columns:repeat(7,1fr);gap:2px}.number{height:40px}.board{padding:13px}.sheet{top:16px}
+}
+@media(prefers-reduced-motion:reduce){*,*:before{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header><span class="brand"><span class="symbol" aria-hidden="true"></span>Live Lotto</span><button class="back" hidden>← Choose a game</button></header>
+<main class="stage">
+  <div class="sheet" inert aria-hidden="true"><div class="sheet-wrap"></div>
+    <button class="board-edge prev" hidden aria-label="Previous play"><span aria-hidden="true">‹</span></button>
+    <button class="board-edge forward" hidden aria-label="Next board"><span aria-hidden="true">›</span></button>
+  </div>
+  <section class="cover" aria-labelledby="choose"><h1 id="choose">Choose your game.</h1>
+    <div class="cards">
+      <button class="card" data-game="pb"><span class="name">Powerball</span><span class="price">$2 / play</span><span class="ball" aria-hidden="true"><i>26</i></span></button>
+      <button class="card mega" data-game="mm"><span class="name">Mega Millions</span><span class="price">$5 / play</span><span class="ball" aria-hidden="true"><i>24</i></span></button>
+    </div>
+  </section>
+</main>
+<section class="review" hidden aria-labelledby="review-title">
+  <h2 id="review-title" tabindex="-1">Review your plays</h2>
+  <p class="review-game"></p><ul></ul><strong class="review-total"></strong>
+  <p><button class="return">Back to playslip</button></p>
+</section>
+<script>
+const games={pb:{name:"Powerball",white:69,special:26,accent:"#a03829",label:"Powerball"},mm:{name:"Mega Millions",white:70,special:24,accent:"#294b7d",label:"Mega Ball"}};
+const sheet=document.querySelector(".sheet"),wrap=sheet.firstElementChild,cover=document.querySelector(".cover"),back=document.querySelector(".back");
+function emptyPlay(){return {white:new Set(),special:new Set()}}
+const plays={pb:[emptyPlay()],mm:[emptyPlay()]};
+const position={pb:0,mm:0};
+const previousEdge=sheet.querySelector(".prev"),nextEdge=sheet.querySelector(".forward");
+const review=document.querySelector(".review"),stage=document.querySelector(".stage");
+const letters="ABCDE";
+function activePlay(){return plays[current][position[current]]}
+function canFinish(lines){return lines.some(complete)&&lines.every(play=>complete(play)||blank(play))}
+function complete(play){return play.white.size===5&&play.special.size===1}
+function blank(play){return !play.white.size&&!play.special.size}
+let current=null;
+function board(letter){
+  const el=document.createElement("section");
+  el.className="board";
+  el.innerHTML='<div class="endpaper"></div><div class="slip-head"><strong tabindex="-1"></strong><span class="letter">Board '+letter+'</span></div>';
+  for(const pool of ["white","special"]){
+    const group=document.createElement("div");
+    group.dataset.pool=pool;
+    group.innerHTML='<div class="pool-head"><b></b><span class="count"></span></div><div class="numbers"></div>';
+    el.append(group);
+  }
+  const status=document.createElement("div");status.className="status";status.setAttribute("role","status");el.append(status);
+  return el;
+}
+const boards=Array.from(letters,board);
+wrap.append(...boards);
+let primary=boards[0];
+const previousLine=document.createElement("div");
+previousLine.className="previous-line";
+const actions=document.createElement("div");
+actions.className="play-actions";actions.hidden=true;
+actions.innerHTML='<button class="clear">Clear play</button><button class="next">Next play</button><button class="finish">Finish</button>';
+primary.append(actions);
+const clear=actions.querySelector(".clear"),next=actions.querySelector(".next"),finish=actions.querySelector(".finish");
+function paint(key,preview){
+  const game=games[key];
+  const activeIndex=preview?0:position[key];
+  primary=boards[activeIndex];
+  primary.append(actions);
+  primary.querySelector(".slip-head").after(previousLine);
+  previousLine.textContent="";
+  if(activeIndex>0){
+    const prior=plays[key][activeIndex-1];
+    const whites=Array.from(prior.white).sort((a,b)=>a-b).join(" ");
+    previousLine.textContent="✓ "+letters[activeIndex-1]+" saved · "+whites+" · "+game.label+" "+[...prior.special][0];
+  }
+  wrap.style.setProperty("--shift",-activeIndex);
+  document.documentElement.style.setProperty("--accent",preview?"#885c44":game.accent);
+  for(const [index,el] of boards.entries()){
+    const saved=!preview&&index!==activeIndex&&plays[key][index]&&complete(plays[key][index]);
+    el.inert=el!==primary;
+    el.classList.toggle("saved",saved);
+    el.classList.toggle("upcoming",index>activeIndex&&!saved);
+    el.querySelector(".letter").textContent="Board "+letters[index]+(saved?" · ✓ Saved":"");
+    el.querySelector(".status").textContent="";
+    el.querySelector("strong").textContent=preview?"Lotto playslip":game.name;
+    for(const field of el.querySelectorAll("[data-pool]")){
+      const pool=field.dataset.pool,white=pool==="white";
+      field.querySelector(".count").textContent="";
+      field.querySelector("b").textContent=white?"Pick 5 white numbers":"Pick 1 "+(preview?"special ball":game.label);
+      const grid=field.querySelector(".numbers");grid.replaceChildren();
+      for(let n=1;n<=game[pool];n++){
+        const interactive=el===primary;
+        const cell=document.createElement(interactive?"button":"span");
+        cell.className="number";cell.textContent=String(n).padStart(2,"0");
+        const marked=!preview&&plays[key][index]?.[pool].has(n);
+        if(interactive||marked)cell.setAttribute("aria-pressed",String(Boolean(marked)));
+        if(interactive){cell.value=n;cell.setAttribute("aria-label",(white?"White number ":game.label+" ")+n)}
+        grid.append(cell);
+      }
+    }
+  }
+  updateCount();
+}
+function updateCount(){
+  for(const field of primary.querySelectorAll("[data-pool]")){
+    const pool=field.dataset.pool;
+    field.querySelector(".count").textContent=current?(activePlay()[pool].size+" / "+(pool==="white"?5:1)):"";
+  }
+  actions.hidden=!current;
+  const status=primary.querySelector(".status");
+  status.textContent="";
+  previousEdge.hidden=!current||position[current]===0;
+  nextEdge.hidden=!current||position[current]===letters.length-1;
+  if(!current)return;
+  const lines=plays[current],play=activePlay(),index=position[current];
+  clear.disabled=blank(play);
+  next.hidden=nextEdge.hidden;
+  next.disabled=nextEdge.disabled=!complete(play);
+  finish.disabled=!canFinish(lines);
+  if(complete(play))status.textContent="Board "+letters[index]+" complete.";
+  else if(blank(play)&&lines.some(complete)){
+    const count=lines.filter(complete).length;
+    status.textContent=count+" completed "+(count===1?"play":"plays")+".";
+  }
+  const unfinished=lines.findIndex(line=>!blank(line)&&!complete(line));
+  if(unfinished>=0&&unfinished!==index)status.textContent+=" Complete or clear Board "+letters[unfinished]+" to finish.";
+}
+function fit(){document.documentElement.style.setProperty("--stage-height",primary.offsetHeight+48+"px")}
+function choose(key){
+  current=key;paint(key,false);fit();cover.inert=true;sheet.inert=false;sheet.removeAttribute("aria-hidden");back.hidden=false;
+  document.body.classList.add("active");primary.querySelector("strong").focus({preventScroll:true});
+}
+cover.addEventListener("click",event=>{const card=event.target.closest("[data-game]");if(card)choose(card.dataset.game)});
+back.addEventListener("click",()=>{
+  review.hidden=true;stage.hidden=false;
+  const previous=current;current=null;sheet.inert=true;sheet.setAttribute("aria-hidden","true");cover.inert=false;back.hidden=true;
+  document.body.classList.remove("active");paint("pb",true);window.scrollTo(0,0);cover.querySelector('[data-game="'+previous+'"]').focus({preventScroll:true});
+});
+wrap.addEventListener("click",event=>{
+  const cell=event.target.closest("button.number");if(!current||!cell)return;
+  const field=cell.closest("[data-pool]"),pool=field.dataset.pool,num=Number(cell.value),marked=activePlay()[pool];
+  const status=primary.querySelector(".status");status.textContent="";
+  if(marked.has(num)){marked.delete(num)}
+  else if(pool==="white"&&marked.size===5){status.textContent="Clear a marked white number to choose another.";return}
+  else{if(pool==="special"){marked.clear();field.querySelector('[aria-pressed="true"]')?.setAttribute("aria-pressed","false")}marked.add(num)}
+  cell.setAttribute("aria-pressed",String(marked.has(num)));updateCount();
+});
+clear.addEventListener("click",()=>{
+  const play=activePlay();
+  play.white.clear();play.special.clear();
+  paint(current,false);
+  primary.querySelector(".status").textContent="Current play cleared.";
+  primary.querySelector("button.number").focus();
+});
+function moveBoard(step){
+  if(!current)return;
+  const target=position[current]+step;
+  if(target<0||target>=letters.length||(step>0&&!complete(activePlay())))return;
+  if(target===plays[current].length)plays[current].push(emptyPlay());
+  position[current]=target;
+  paint(current,false);
+  primary.querySelector(".letter").tabIndex=-1;
+  primary.querySelector(".letter").focus({preventScroll:true});
+  window.scrollTo(0,0);
+}
+previousEdge.addEventListener("click",()=>moveBoard(-1));
+nextEdge.addEventListener("click",()=>moveBoard(1));
+next.addEventListener("click",()=>moveBoard(1));
+finish.addEventListener("click",()=>{
+  const lines=plays[current];
+  if(!canFinish(lines))return;
+  const completed=lines.filter(complete);
+  review.querySelector(".review-game").textContent=games[current].name;
+  const rows=review.querySelector("ul");rows.replaceChildren();
+  for(const [index,play] of lines.entries()){
+    if(!complete(play))continue;
+    const row=document.createElement("li");
+    const numbers=Array.from(play.white).sort((a,b)=>a-b).map(n=>String(n).padStart(2,"0"));
+    row.textContent="Play "+letters[index]+" · "+numbers.join(" ")+" · "+games[current].label+" "+Array.from(play.special)[0];
+    rows.append(row);
+  }
+  const price=current==="pb"?2:5;
+  review.querySelector(".review-total").textContent=completed.length+(completed.length===1?" play":" plays")+" · Base total $"+completed.length*price;
+  stage.hidden=true;review.hidden=false;window.scrollTo(0,0);review.querySelector("h2").focus();
+});
+review.querySelector(".return").addEventListener("click",()=>{
+  review.hidden=true;stage.hidden=false;fit();finish.focus();
+});
+new ResizeObserver(fit).observe(wrap);paint("pb",true);fit();
+</script></body></html>
